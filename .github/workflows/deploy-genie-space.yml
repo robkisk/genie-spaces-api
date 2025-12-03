@@ -1,0 +1,185 @@
+# GitHub Actions workflow for deploying Genie Spaces
+#
+# This workflow demonstrates how to:
+# 1. Validate Genie Space configurations
+# 2. Deploy to staging for testing
+# 3. Deploy to production on approval
+#
+# Required secrets:
+# - STAGING_DATABRICKS_HOST: Staging workspace URL
+# - STAGING_DATABRICKS_TOKEN: Staging PAT
+# - PROD_DATABRICKS_HOST: Production workspace URL
+# - PROD_DATABRICKS_TOKEN: Production PAT
+#
+# Required variables:
+# - STAGING_SPACE_ID: Space ID in staging
+# - STAGING_WAREHOUSE_ID: SQL Warehouse ID in staging
+# - PROD_SPACE_ID: Space ID in production
+# - PROD_WAREHOUSE_ID: SQL Warehouse ID in production
+
+name: Deploy Genie Space
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'genie-spaces/**'
+      - '.github/workflows/deploy-genie-space.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'genie-spaces/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  validate:
+    name: Validate Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Setup Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install genie-spaces-api
+        run: uv tool install genie-spaces-api
+
+      - name: Validate staging configuration
+        run: uvx genie-spaces-api validate genie-spaces/staging.json
+
+      - name: Validate production configuration
+        run: uvx genie-spaces-api validate genie-spaces/production.json
+
+      - name: Show configuration summary
+        run: |
+          echo "## Staging Configuration" >> $GITHUB_STEP_SUMMARY
+          uvx genie-spaces-api validate genie-spaces/staging.json 2>&1 | tail -20 >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Production Configuration" >> $GITHUB_STEP_SUMMARY
+          uvx genie-spaces-api validate genie-spaces/production.json 2>&1 | tail -20 >> $GITHUB_STEP_SUMMARY
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: validate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Setup Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install genie-spaces-api
+        run: uv tool install genie-spaces-api
+
+      - name: Deploy to staging
+        env:
+          DATABRICKS_HOST: ${{ secrets.STAGING_DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.STAGING_DATABRICKS_TOKEN }}
+        run: |
+          echo "Deploying to staging space: ${{ vars.STAGING_SPACE_ID }}"
+          uvx genie-spaces-api update ${{ vars.STAGING_SPACE_ID }} \
+            --file genie-spaces/staging.json \
+            --warehouse ${{ vars.STAGING_WAREHOUSE_ID }}
+
+      - name: Post deployment summary
+        run: |
+          echo "## Staging Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- **Space ID:** ${{ vars.STAGING_SPACE_ID }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Warehouse:** ${{ vars.STAGING_WAREHOUSE_ID }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+
+  deploy-production:
+    name: Deploy to Production
+    needs: [validate, deploy-staging]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Setup Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install genie-spaces-api
+        run: uv tool install genie-spaces-api
+
+      - name: Export current production config (backup)
+        env:
+          DATABRICKS_HOST: ${{ secrets.PROD_DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.PROD_DATABRICKS_TOKEN }}
+        run: |
+          echo "Creating backup of current production configuration..."
+          uvx genie-spaces-api export ${{ vars.PROD_SPACE_ID }} -o backup-$(date +%Y%m%d-%H%M%S).json || true
+
+      - name: Deploy to production
+        env:
+          DATABRICKS_HOST: ${{ secrets.PROD_DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.PROD_DATABRICKS_TOKEN }}
+        run: |
+          echo "Deploying to production space: ${{ vars.PROD_SPACE_ID }}"
+          uvx genie-spaces-api update ${{ vars.PROD_SPACE_ID }} \
+            --file genie-spaces/production.json \
+            --warehouse ${{ vars.PROD_WAREHOUSE_ID }}
+
+      - name: Post deployment summary
+        run: |
+          echo "## Production Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- **Space ID:** ${{ vars.PROD_SPACE_ID }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Warehouse:** ${{ vars.PROD_WAREHOUSE_ID }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+  # Optional: Create a new space instead of updating existing
+  create-new-space:
+    name: Create New Space
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'new'
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Setup Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install genie-spaces-api
+        run: uv tool install genie-spaces-api
+
+      - name: Create new space
+        env:
+          DATABRICKS_HOST: ${{ secrets.STAGING_DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.STAGING_DATABRICKS_TOKEN }}
+        run: |
+          uvx genie-spaces-api import genie-spaces/staging.json \
+            --warehouse ${{ vars.STAGING_WAREHOUSE_ID }} \
+            --path "/Workspace/Shared/Genie Spaces" \
+            --title "New Analytics Space"

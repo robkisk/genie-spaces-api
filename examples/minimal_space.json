@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "config": {
+    "sample_questions": [
+      {
+        "id": "11111111222233334444555566667777",
+        "question": ["How many records are in the table?"]
+      },
+      {
+        "id": "22223333444455556666777788889999",
+        "question": ["What are the column names and types?"]
+      }
+    ]
+  },
+  "data_sources": {
+    "tables": [
+      {
+        "identifier": "catalog.schema.my_table",
+        "description": ["Your table description here"]
+      }
+    ]
+  },
+  "instructions": {
+    "text_instructions": [
+      {
+        "id": "aaaabbbbccccddddeeeeffffgggghhh",
+        "content": [
+          "Keep responses concise and to the point.",
+          "Format dates as YYYY-MM-DD."
+        ]
+      }
+    ]
+  }
+}

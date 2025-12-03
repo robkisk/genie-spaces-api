@@ -1,0 +1,402 @@
+{
+  "version": 1,
+  "config": {
+    "sample_questions": [
+      {
+        "id": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+        "question": ["What is our total revenue by region this quarter?"]
+      },
+      {
+        "id": "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7",
+        "question": ["Who are our top 10 customers by total spend?"]
+      },
+      {
+        "id": "c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8",
+        "question": ["What is the month-over-month growth rate?"]
+      },
+      {
+        "id": "d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9",
+        "question": ["Show me the order trends for the last 12 months"]
+      }
+    ]
+  },
+  "data_sources": {
+    "tables": [
+      {
+        "identifier": "sales.prod.orders",
+        "description": [
+          "Central orders table containing all customer transactions.",
+          "Each row represents a single order line item.",
+          "Updated daily with a 24-hour lag from source systems."
+        ],
+        "column_configs": [
+          {
+            "column_name": "order_id",
+            "description": ["Unique identifier for each order"],
+            "synonyms": ["id", "order_number", "orderid"],
+            "get_example_values": true
+          },
+          {
+            "column_name": "customer_id",
+            "description": ["Reference to the customer who placed the order"],
+            "synonyms": ["cust_id", "buyer_id"],
+            "build_value_dictionary": true
+          },
+          {
+            "column_name": "order_date",
+            "description": ["Date when the order was placed (UTC)"],
+            "synonyms": ["date", "purchase_date", "transaction_date"]
+          },
+          {
+            "column_name": "product_id",
+            "description": ["Reference to the product ordered"],
+            "synonyms": ["item_id", "sku"],
+            "build_value_dictionary": true
+          },
+          {
+            "column_name": "quantity",
+            "description": ["Number of units ordered"],
+            "synonyms": ["qty", "units", "count"]
+          },
+          {
+            "column_name": "unit_price",
+            "description": ["Price per unit in USD"],
+            "synonyms": ["price", "cost"]
+          },
+          {
+            "column_name": "region",
+            "description": ["Geographic region of the sale"],
+            "synonyms": ["territory", "area", "geo"],
+            "build_value_dictionary": true,
+            "get_example_values": true
+          },
+          {
+            "column_name": "sales_rep_id",
+            "description": ["Sales representative who closed the deal"],
+            "synonyms": ["rep_id", "salesperson"],
+            "build_value_dictionary": true
+          }
+        ]
+      },
+      {
+        "identifier": "sales.prod.customers",
+        "description": [
+          "Customer master data table.",
+          "Contains demographic and account information for all customers."
+        ],
+        "column_configs": [
+          {
+            "column_name": "customer_id",
+            "description": ["Unique customer identifier"],
+            "synonyms": ["id", "cust_id"]
+          },
+          {
+            "column_name": "customer_name",
+            "description": ["Full name of the customer or company"],
+            "synonyms": ["name", "account_name", "company"]
+          },
+          {
+            "column_name": "segment",
+            "description": ["Customer segment classification"],
+            "synonyms": ["tier", "category", "type"],
+            "build_value_dictionary": true,
+            "get_example_values": true
+          },
+          {
+            "column_name": "created_at",
+            "description": ["Date when customer account was created"],
+            "synonyms": ["signup_date", "registration_date"]
+          }
+        ]
+      },
+      {
+        "identifier": "sales.prod.products",
+        "description": [
+          "Product catalog with pricing and categorization."
+        ],
+        "column_configs": [
+          {
+            "column_name": "product_id",
+            "description": ["Unique product identifier"],
+            "synonyms": ["id", "sku", "item_id"]
+          },
+          {
+            "column_name": "product_name",
+            "description": ["Display name of the product"],
+            "synonyms": ["name", "title", "item_name"]
+          },
+          {
+            "column_name": "category",
+            "description": ["Product category"],
+            "synonyms": ["product_category", "type"],
+            "build_value_dictionary": true,
+            "get_example_values": true
+          },
+          {
+            "column_name": "list_price",
+            "description": ["Standard list price in USD"],
+            "synonyms": ["price", "msrp"]
+          }
+        ]
+      }
+    ],
+    "metric_views": [
+      {
+        "identifier": "sales.analytics.daily_revenue_mv",
+        "description": [
+          "Pre-aggregated daily revenue metrics by region and segment.",
+          "Use this for time-series revenue analysis."
+        ]
+      },
+      {
+        "identifier": "sales.analytics.customer_ltv_mv",
+        "description": [
+          "Customer lifetime value calculations.",
+          "Updated weekly on Sundays."
+        ]
+      }
+    ]
+  },
+  "instructions": {
+    "text_instructions": [
+      {
+        "id": "e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0",
+        "content": [
+          "## Date Handling",
+          "- Always use DATE type for date comparisons, not strings",
+          "- Use DATE_TRUNC for period aggregations (quarter, month, week)",
+          "- The current fiscal year starts on February 1st",
+          "",
+          "## Currency Formatting",
+          "- All monetary values are in USD",
+          "- Format currency with $ symbol and 2 decimal places",
+          "- Use FORMAT_NUMBER for large values (e.g., $1.2M)",
+          "",
+          "## Regional Mapping",
+          "- 'NA' or 'North America' includes US and Canada",
+          "- 'EMEA' includes Europe, Middle East, and Africa",
+          "- 'APAC' includes Asia Pacific region",
+          "- 'LATAM' includes Latin America",
+          "",
+          "## Common Calculations",
+          "- Revenue = quantity * unit_price",
+          "- YoY Growth = (current - prior) / prior * 100",
+          "- Always exclude cancelled orders (status != 'cancelled')"
+        ]
+      }
+    ],
+    "example_question_sqls": [
+      {
+        "id": "f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1",
+        "question": ["What are the top N products by revenue in a date range?"],
+        "sql": [
+          "SELECT",
+          "  p.product_name,",
+          "  p.category,",
+          "  SUM(o.quantity * o.unit_price) as total_revenue,",
+          "  SUM(o.quantity) as units_sold",
+          "FROM sales.prod.orders o",
+          "JOIN sales.prod.products p ON o.product_id = p.product_id",
+          "WHERE o.order_date BETWEEN :start_date AND :end_date",
+          "GROUP BY p.product_name, p.category",
+          "ORDER BY total_revenue DESC",
+          "LIMIT :limit_n"
+        ],
+        "parameters": [
+          {
+            "name": "start_date",
+            "type_hint": "DATE",
+            "description": ["Start date for the analysis period (inclusive)"]
+          },
+          {
+            "name": "end_date",
+            "type_hint": "DATE",
+            "description": ["End date for the analysis period (inclusive)"]
+          },
+          {
+            "name": "limit_n",
+            "type_hint": "INTEGER",
+            "description": ["Number of top products to return"]
+          }
+        ],
+        "usage_guidance": [
+          "Use this template for any top-N product analysis.",
+          "Adapt the ORDER BY clause for different ranking criteria."
+        ]
+      },
+      {
+        "id": "a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2",
+        "question": ["Calculate month-over-month growth rate"],
+        "sql": [
+          "WITH monthly_revenue AS (",
+          "  SELECT",
+          "    DATE_TRUNC('month', order_date) as month,",
+          "    SUM(quantity * unit_price) as revenue",
+          "  FROM sales.prod.orders",
+          "  WHERE order_date >= DATE_ADD(CURRENT_DATE, -365)",
+          "  GROUP BY DATE_TRUNC('month', order_date)",
+          "),",
+          "growth AS (",
+          "  SELECT",
+          "    month,",
+          "    revenue,",
+          "    LAG(revenue) OVER (ORDER BY month) as prev_revenue",
+          "  FROM monthly_revenue",
+          ")",
+          "SELECT",
+          "  month,",
+          "  revenue,",
+          "  prev_revenue,",
+          "  ROUND((revenue - prev_revenue) / prev_revenue * 100, 2) as mom_growth_pct",
+          "FROM growth",
+          "WHERE prev_revenue IS NOT NULL",
+          "ORDER BY month DESC"
+        ],
+        "usage_guidance": [
+          "Template for month-over-month growth calculations.",
+          "Can be adapted for week-over-week or year-over-year by changing DATE_TRUNC."
+        ]
+      },
+      {
+        "id": "b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3",
+        "question": ["Revenue by region with comparison to prior period"],
+        "sql": [
+          "WITH current_period AS (",
+          "  SELECT",
+          "    region,",
+          "    SUM(quantity * unit_price) as current_revenue",
+          "  FROM sales.prod.orders",
+          "  WHERE order_date BETWEEN :current_start AND :current_end",
+          "  GROUP BY region",
+          "),",
+          "prior_period AS (",
+          "  SELECT",
+          "    region,",
+          "    SUM(quantity * unit_price) as prior_revenue",
+          "  FROM sales.prod.orders",
+          "  WHERE order_date BETWEEN :prior_start AND :prior_end",
+          "  GROUP BY region",
+          ")",
+          "SELECT",
+          "  c.region,",
+          "  c.current_revenue,",
+          "  p.prior_revenue,",
+          "  ROUND((c.current_revenue - p.prior_revenue) / p.prior_revenue * 100, 2) as growth_pct",
+          "FROM current_period c",
+          "LEFT JOIN prior_period p ON c.region = p.region",
+          "ORDER BY c.current_revenue DESC"
+        ],
+        "parameters": [
+          {
+            "name": "current_start",
+            "type_hint": "DATE",
+            "description": ["Start of current comparison period"]
+          },
+          {
+            "name": "current_end",
+            "type_hint": "DATE",
+            "description": ["End of current comparison period"]
+          },
+          {
+            "name": "prior_start",
+            "type_hint": "DATE",
+            "description": ["Start of prior comparison period"]
+          },
+          {
+            "name": "prior_end",
+            "type_hint": "DATE",
+            "description": ["End of prior comparison period"]
+          }
+        ]
+      }
+    ],
+    "sql_functions": [
+      {
+        "id": "c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4",
+        "identifier": "sales.udfs.calculate_discount_pct"
+      },
+      {
+        "id": "d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5",
+        "identifier": "sales.udfs.fiscal_quarter"
+      }
+    ],
+    "join_specs": [
+      {
+        "id": "e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6",
+        "left": {
+          "identifier": "sales.prod.orders",
+          "alias": "o"
+        },
+        "right": {
+          "identifier": "sales.prod.customers",
+          "alias": "c"
+        },
+        "sql": ["o.customer_id = c.customer_id"],
+        "comment": ["Join orders to customers for customer details and segmentation"]
+      },
+      {
+        "id": "f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7",
+        "left": {
+          "identifier": "sales.prod.orders",
+          "alias": "o"
+        },
+        "right": {
+          "identifier": "sales.prod.products",
+          "alias": "p"
+        },
+        "sql": ["o.product_id = p.product_id"],
+        "comment": ["Join orders to products for product details and categorization"]
+      }
+    ]
+  },
+  "benchmarks": {
+    "questions": [
+      {
+        "id": "a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8",
+        "question": ["What was the total revenue last quarter?"],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT SUM(quantity * unit_price) as total_revenue",
+              "FROM sales.prod.orders",
+              "WHERE order_date >= DATE_TRUNC('quarter', DATE_ADD(CURRENT_DATE, -90))",
+              "  AND order_date < DATE_TRUNC('quarter', CURRENT_DATE)"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9",
+        "question": ["How many unique customers made purchases this month?"],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT COUNT(DISTINCT customer_id) as unique_customers",
+              "FROM sales.prod.orders",
+              "WHERE order_date >= DATE_TRUNC('month', CURRENT_DATE)"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0",
+        "question": ["What is the average order value by region?"],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT",
+              "  region,",
+              "  AVG(quantity * unit_price) as avg_order_value",
+              "FROM sales.prod.orders",
+              "GROUP BY region",
+              "ORDER BY avg_order_value DESC"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
